@@ -12,7 +12,7 @@
     Version="1.0.0.0"
     ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>Bticon</DisplayName>
+    <DisplayName>Bticon Battery Monitor</DisplayName>
     <PublisherDisplayName>Bticon</PublisherDisplayName>
     <Description>Monitor de batería de dispositivos Bluetooth.</Description>
     <Logo>Assets\StoreLogo.png</Logo>
@@ -33,7 +33,7 @@
       uap10:RuntimeBehavior="packagedClassicApp"
       uap10:TrustLevel="mediumIL">
       <uap:VisualElements
-        DisplayName="Bticon"
+        DisplayName="Bticon Battery Monitor"
         Description="Monitor de batería de dispositivos Bluetooth."
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
@@ -43,12 +43,13 @@
           <uap5:StartupTask
             TaskId="BticonStartupTask"
             Enabled="false"
-            DisplayName="Bticon" />
+            DisplayName="Bticon Battery Monitor" />
         </uap5:Extension>
       </Extensions>
     </Application>
   </Applications>
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
+    <DeviceCapability Name="bluetooth" />
   </Capabilities>
 </Package>
