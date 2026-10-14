@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -9,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using Windows.ApplicationModel;
 
 namespace Bticon
 {
@@ -17,8 +19,14 @@ namespace Bticon
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool DestroyIcon(IntPtr hIcon);
 
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetCurrentPackageFullName")]
+        private static extern int GetCurrentPackageFullName(ref uint packageFullNameLength, IntPtr packageFullName);
+
         private const string AppRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
         private const string AppRegistryValueName = "Bticon_BatteryMonitor";
+        private const string StartupTaskId = "BticonStartupTask";
+        private const int ErrorInsufficientBuffer = 122;
+        private const int AppModelErrorNoPackage = 15700;
         private const int NotifyIconMaxTooltipLength = 63;
 
         private readonly Control _invoker;
@@ -55,6 +63,7 @@ namespace Bticon
             _ = _invoker.Handle;
 
             _contextMenu = BuildContextMenu();
+            _ = UpdateStartupMenuStateAsync();
 
             _notifyIcon = new NotifyIcon
             {
@@ -92,7 +101,11 @@ namespace Bticon
         {
             try
             {
-                string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bticon_debug.log");
+                string logDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Bticon");
+                Directory.CreateDirectory(logDirectory);
+                string logPath = Path.Combine(logDirectory, "bticon_debug.log");
                 File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}\r\n");
             }
             catch { }
@@ -154,9 +167,9 @@ namespace Bticon
 
             menu.Items.Add(new ToolStripSeparator());
 
-            _startupItem = new ToolStripMenuItem("🚀 Iniciar con Windows", null, (s, e) => ToggleStartupWithWindows())
+            _startupItem = new ToolStripMenuItem("🚀 Iniciar con Windows", null, async (s, e) => await ToggleStartupWithWindowsAsync())
             {
-                Checked = IsStartupWithWindowsEnabled()
+                Checked = !IsPackagedProcess() && IsStartupWithWindowsEnabled()
             };
             menu.Items.Add(_startupItem);
 
@@ -355,10 +368,46 @@ namespace Bticon
             }
         }
 
-        private void ToggleStartupWithWindows()
+        private async Task UpdateStartupMenuStateAsync()
         {
             try
             {
+                if (IsPackagedProcess())
+                {
+                    var startupTask = await StartupTask.GetAsync(StartupTaskId);
+                    _startupItem.Checked = startupTask.State == StartupTaskState.Enabled
+                        || startupTask.State == StartupTaskState.EnabledByPolicy;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Error al consultar el inicio con Windows: {ex}");
+                MessageBox.Show($"No se pudo consultar el inicio con Windows: {ex.Message}", "Bticon", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private async Task ToggleStartupWithWindowsAsync()
+        {
+            try
+            {
+                if (IsPackagedProcess())
+                {
+                    var startupTask = await StartupTask.GetAsync(StartupTaskId);
+                    if (startupTask.State == StartupTaskState.Enabled
+                        || startupTask.State == StartupTaskState.EnabledByPolicy)
+                    {
+                        startupTask.Disable();
+                    }
+                    else
+                    {
+                        await startupTask.RequestEnableAsync();
+                    }
+
+                    _startupItem.Checked = startupTask.State == StartupTaskState.Enabled
+                        || startupTask.State == StartupTaskState.EnabledByPolicy;
+                    return;
+                }
+
                 using var key = Registry.CurrentUser.OpenSubKey(AppRegistryKey, true);
                 if (key == null) return;
 
@@ -379,6 +428,17 @@ namespace Bticon
             {
                 MessageBox.Show($"Error al configurar inicio con Windows: {ex.Message}", "Bticon", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private static bool IsPackagedProcess()
+        {
+            uint packageFullNameLength = 0;
+            int result = GetCurrentPackageFullName(ref packageFullNameLength, IntPtr.Zero);
+
+            if (result == AppModelErrorNoPackage) return false;
+            if (result == ErrorInsufficientBuffer || result == 0) return true;
+
+            throw new Win32Exception(result, "No se pudo determinar si Bticon se está ejecutando como una aplicación empaquetada.");
         }
 
         private void ExitApplication()

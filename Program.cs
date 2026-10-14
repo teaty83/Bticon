@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -63,8 +62,6 @@ namespace Bticon
             try
             {
                 TrayApplicationContext.Log($"[ERROR] [{context}] {ex}");
-                string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "bticon_error.log");
-                File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{context}] {ex}\n\n");
             }
             catch { }
         }

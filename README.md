@@ -52,3 +52,21 @@ dotnet build
 # Publicación como ejecutable único
 dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o publish
 ```
+
+### Crear un paquete MSIX de prueba
+
+Con Windows 10/11 SDK instalado, ejecuta desde PowerShell:
+
+```powershell
+.\packaging\Build-MSIX.ps1
+```
+
+El paquete local se genera en `.artifacts\msix` con una identidad de prueba. Antes de enviarlo a Microsoft Store, reserva el producto en Partner Center y vuelve a generar el paquete con los valores exactos de identidad y editor asignados:
+
+```powershell
+.\packaging\Build-MSIX.ps1 -PackageName "IDENTIDAD_DE_PARTNER_CENTER" -Publisher "EDITOR_DE_PARTNER_CENTER" -Version "1.0.0.0"
+```
+
+El paquete declara acceso de confianza completa para la aplicación de escritorio y usa una tarea de inicio de Windows compatible con aplicaciones empaquetadas. Las imágenes de la aplicación incluidas por el script son provisionales; reemplázalas por los recursos finales de la ficha de Store antes de publicar.
+
+El archivo generado es un MSIX sin firmar, útil para comprobar la compilación, el manifiesto y el contenido del paquete. Para instalarlo localmente hace falta firmarlo y confiar en el certificado de desarrollo; el paquete con identidad local no se puede enviar a Microsoft Store.
